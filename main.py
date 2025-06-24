@@ -1,5 +1,4 @@
-# main.py
-from flask import Flask, request, jsonify
+from flask import Flask, request, Response
 from dotenv import load_dotenv
 import requests
 import time
@@ -15,31 +14,6 @@ def index():
     return 'Hello, World!'
 
 
-# @app.route('/proxy', methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
-# def proxy():
-#     path = request.args.get('path')
-#     url = f'{os.getenv("HOST")}{path}'
-
-#     print(f'path: {path}')
-#     print(f'url: {url}')
-
-#     start = time.time()
-
-#     response = requests.request(
-#         method=request.method,
-#         url=url,
-#         headers={key: value for key,
-#                  value in request.headers if key != 'Host'},
-#         data=request.get_data(),
-#         cookies=request.cookies,
-#         allow_redirects=False)
-
-#     end = time.time()
-
-#     print(f'{url} - {response.status_code} - {end-start} seconds')
-
-#     return (response.content, response.status_code, response.headers.items())
-
 @app.route('/<path:path>', methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
 def catch_all(path):
     print('='*50)
@@ -49,7 +23,6 @@ def catch_all(path):
 
     print(f'complete_path: {complete_path}')
     print('-'*50)
-    # print(f'n===url: {url}')
 
     start = time.time()
 
@@ -57,16 +30,39 @@ def catch_all(path):
         method=request.method,
         url=url,
         headers={key: value for key,
-                 value in request.headers if key != 'Host'},
+                 value in request.headers if key.lower() != 'host'},
         data=request.get_data(),
         cookies=request.cookies,
-        allow_redirects=False)
+        allow_redirects=False
+    )
 
     end = time.time()
-
     print(f'{url} - {response.status_code} - {end-start} seconds')
 
-    return (response.content, response.status_code, response.headers.items())
+    # Détection du type de fichier
+    content_type = response.headers.get('Content-Type', '')
+    filename = path.split("/")[-1]
+
+    # Forcer le bon type MIME si Excel ou PDF
+    if filename.endswith('.xlsx'):
+        content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    elif filename.endswith('.pdf'):
+        content_type = 'application/pdf'
+
+    # Forcer Content-Disposition si fichier à télécharger
+    force_download = filename.endswith('.xlsx') or filename.endswith('.pdf')
+    headers = {
+        'Content-Type': content_type
+    }
+
+    if force_download:
+        headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    return Response(
+        response.content,
+        status=response.status_code,
+        headers=headers
+    )
 
 
 if __name__ == '__main__':
